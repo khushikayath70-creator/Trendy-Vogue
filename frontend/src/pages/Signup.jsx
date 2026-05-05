@@ -1,26 +1,19 @@
+// frontend/src/pages/Signup.jsx
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import AuthPopup from "../components/AuthPopup";
+import API from "../api/api";
 
 export default function Signup() {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    password: "",
-  });
-
+  const [formData, setFormData] = useState({ name: "", email: "", password: "" });
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-
   const [popupOpen, setPopupOpen] = useState(false);
-  const [popupData, setPopupData] = useState({
-    title: "",
-    message: "",
-  });
+  const [popupData, setPopupData] = useState({ title: "", message: "" });
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -33,30 +26,12 @@ export default function Signup() {
     setError("");
 
     try {
-      const res = await fetch("http://localhost:5000/api/auth/signup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.message || "Signup failed");
-        return;
-      }
-
-      login(data);
-
-      setPopupData({
-        title: "Account Created",
-        message: "Your signup was successful. You are now logged in.",
-      });
+      const res = await API.post("/auth/signup", formData);
+      login(res.data);
+      setPopupData({ title: "Account Created", message: "Your signup was successful. You are now logged in." });
       setPopupOpen(true);
     } catch (err) {
-      setError("server not connected");
+      setError(err?.response?.data?.message || "Signup failed. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -75,27 +50,25 @@ export default function Signup() {
               placeholder="Full Name"
               value={formData.name}
               onChange={handleChange}
-              className="w-full border p-3 rounded-lg outline-none"
+              className="w-full border p-3 rounded-lg outline-none focus:border-[#111] transition"
               required
             />
-
             <input
               type="email"
               name="email"
               placeholder="Email"
               value={formData.email}
               onChange={handleChange}
-              className="w-full border p-3 rounded-lg outline-none"
+              className="w-full border p-3 rounded-lg outline-none focus:border-[#111] transition"
               required
             />
-
             <input
               type="password"
               name="password"
               placeholder="Password"
               value={formData.password}
               onChange={handleChange}
-              className="w-full border p-3 rounded-lg outline-none"
+              className="w-full border p-3 rounded-lg outline-none focus:border-[#111] transition"
               required
             />
 
@@ -108,7 +81,7 @@ export default function Signup() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full bg-black text-white py-3 rounded-lg disabled:opacity-60"
+              className="w-full bg-black text-white py-3 rounded-lg disabled:opacity-60 hover:bg-gray-800 transition"
             >
               {submitting ? "Please wait..." : "Signup"}
             </button>
@@ -116,9 +89,7 @@ export default function Signup() {
 
           <p className="text-sm text-center mt-4">
             Already have an account?{" "}
-            <Link to="/login" className="text-blue-600">
-              Login
-            </Link>
+            <Link to="/login" className="text-blue-600">Login</Link>
           </p>
         </div>
       </div>

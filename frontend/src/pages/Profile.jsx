@@ -16,6 +16,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useShop } from "../context/ShopContext";
 import AuthPopup from "../components/AuthPopup";
+import API from "../api/api";
 
 export default function Profile() {
   const outletContext = useOutletContext() || {};
@@ -53,38 +54,31 @@ export default function Profile() {
     if (saveMessage) setSaveMessage("");
   };
 
-  const handleProfileUpdate = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    setSaveMessage("");
+const handleProfileUpdate = async (e) => {
+  e.preventDefault();
+  setSaving(true);
+  setSaveMessage("");
 
-    try {
-      const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:5000/api/auth/update-profile", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(editForm),
-      });
+  try {
+    const token = localStorage.getItem("token");
 
-      const data = await res.json();
+    const res = await API.put("/auth/update-profile", editForm, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
-      if (!res.ok) {
-        setSaveMessage(data.message || "Profile update failed");
-        return;
-      }
-
-      updateProfile(data.user);
-      setEditOpen(false);
-      setEditSuccess(true);
-    } catch (error) {
-      setSaveMessage("Server not connected");
-    } finally {
-      setSaving(false);
-    }
-  };
+    updateProfile(res.data.user);
+    setEditOpen(false);
+    setEditSuccess(true);
+  } catch (error) {
+    setSaveMessage(
+      error?.response?.data?.message || "Server not connected"
+    );
+  } finally {
+    setSaving(false);
+  }
+};
 
   return (
     <>

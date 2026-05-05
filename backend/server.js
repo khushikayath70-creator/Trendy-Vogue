@@ -1,3 +1,4 @@
+// backend/server.js
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -16,7 +17,13 @@ const app = express();
 
 connectDB();
 
-app.use(cors());
+// CORS - allow frontend and admin URLs
+app.use(cors({
+  origin: '*', // For production, replace with your actual frontend URLs
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);

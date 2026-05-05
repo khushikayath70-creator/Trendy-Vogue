@@ -1,25 +1,19 @@
+// frontend/src/pages/Login.jsx
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import AuthPopup from "../components/AuthPopup";
+import API from "../api/api";
 
 export default function Login() {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  });
-
+  const [formData, setFormData] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-
   const [popupOpen, setPopupOpen] = useState(false);
-  const [popupData, setPopupData] = useState({
-    title: "",
-    message: "",
-  });
+  const [popupData, setPopupData] = useState({ title: "", message: "" });
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -32,31 +26,12 @@ export default function Login() {
     setError("");
 
     try {
-      const res = await fetch("http://localhost:5000/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.message || "Login failed");
-        return;
-      }
-
-      login(data);
-
-      setPopupData({
-        title: "Welcome Back",
-        message: "You have logged in successfully.",
-      });
-
+      const res = await API.post("/auth/login", formData);
+      login(res.data);
+      setPopupData({ title: "Welcome Back", message: "You have logged in successfully." });
       setPopupOpen(true);
     } catch (err) {
-      setError("server not connected");
+      setError(err?.response?.data?.message || "Login failed. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -75,17 +50,16 @@ export default function Login() {
               placeholder="Email"
               value={formData.email}
               onChange={handleChange}
-              className="w-full border p-3 rounded-lg outline-none"
+              className="w-full border p-3 rounded-lg outline-none focus:border-[#111] transition"
               required
             />
-
             <input
               type="password"
               name="password"
               placeholder="Password"
               value={formData.password}
               onChange={handleChange}
-              className="w-full border p-3 rounded-lg outline-none"
+              className="w-full border p-3 rounded-lg outline-none focus:border-[#111] transition"
               required
             />
 
@@ -98,17 +72,15 @@ export default function Login() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full bg-black text-white py-3 rounded-lg disabled:opacity-60"
+              className="w-full bg-black text-white py-3 rounded-lg disabled:opacity-60 hover:bg-gray-800 transition"
             >
               {submitting ? "Please wait..." : "Login"}
             </button>
           </form>
 
           <p className="text-sm text-center mt-4">
-            Don’t have an account?{" "}
-            <Link to="/signup" className="text-blue-600">
-              Signup
-            </Link>
+            Don't have an account?{" "}
+            <Link to="/signup" className="text-blue-600">Signup</Link>
           </p>
         </div>
       </div>

@@ -1,9 +1,11 @@
+// frontend/src/pages/MyOrders.jsx
 import { useState, useEffect } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { Package, ChevronDown, ChevronUp, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
 import AuthPopup from "../components/AuthPopup";
+import API from "../api/api";
 
 const STATUS_STYLES = {
   processing: "bg-blue-50 text-blue-700",
@@ -38,13 +40,14 @@ export default function MyOrders() {
 
   const fetchOrders = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/orders/my-orders", {
+      const res = await API.get("/orders/my-orders", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await res.json();
-      setOrders(Array.isArray(data) ? data : []);
+      // FIX: was missing setOrders
+      setOrders(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error("Failed to fetch orders", err);
+      setOrders([]);
     } finally {
       setLoading(false);
     }
@@ -52,15 +55,12 @@ export default function MyOrders() {
 
   const handleCancel = async (orderId) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/orders/${orderId}/cancel`, {
-        method: "PUT",
+      await API.put(`/orders/${orderId}/cancel`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) {
-        setCancelConfirm({ open: false, orderId: null });
-        setCancelSuccess(true);
-        fetchOrders();
-      }
+      setCancelConfirm({ open: false, orderId: null });
+      setCancelSuccess(true);
+      fetchOrders();
     } catch (err) {
       console.error("Cancel failed", err);
     }
@@ -107,7 +107,6 @@ export default function MyOrders() {
                   animate={{ opacity: 1, y: 0 }}
                   className="bg-white rounded-[24px] border border-[#ece7df] shadow-sm overflow-hidden"
                 >
-                  {/* Order Header */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5 sm:p-6">
                     <div>
                       <p className="text-xs uppercase tracking-[0.22em] text-[#9a8d81] mb-1">Order ID</p>
@@ -138,7 +137,6 @@ export default function MyOrders() {
                     </div>
                   </div>
 
-                  {/* Order Details Expanded */}
                   <AnimatePresence>
                     {expandedOrder === order._id && (
                       <motion.div
@@ -149,7 +147,6 @@ export default function MyOrders() {
                         className="overflow-hidden border-t border-[#ece7df]"
                       >
                         <div className="p-5 sm:p-6 space-y-4">
-                          {/* Items */}
                           <div className="space-y-3">
                             {order.items.map((item, idx) => (
                               <div key={idx} className="flex gap-3 items-center">
@@ -171,7 +168,6 @@ export default function MyOrders() {
                             ))}
                           </div>
 
-                          {/* Shipping + Payment */}
                           <div className="grid sm:grid-cols-2 gap-4 pt-4 border-t border-[#ece7df]">
                             <div className="bg-[#faf7f3] rounded-2xl p-4">
                               <p className="text-xs uppercase tracking-[0.18em] text-[#9a8d81] mb-2">Shipped To</p>
@@ -191,7 +187,6 @@ export default function MyOrders() {
                             </div>
                           </div>
 
-                          {/* Cancel Button */}
                           {order.status === "processing" && (
                             <button
                               onClick={() => setCancelConfirm({ open: true, orderId: order._id })}
@@ -212,7 +207,6 @@ export default function MyOrders() {
         </div>
       </div>
 
-      {/* Cancel Confirmation */}
       <AuthPopup
         open={cancelConfirm.open}
         type="confirm"

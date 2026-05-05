@@ -4,24 +4,27 @@ import { useAuth } from "./AuthContext";
 
 const ShopContext = createContext();
 
+const BASE_URL = "https://trendy-vogue.onrender.com/api";
+
 export const ShopProvider = ({ children }) => {
   const { user } = useAuth();
 
   const [wishlistItems, setWishlistItems] = useState([]);
   const [cartItems, setCartItems] = useState([]);
   const [showLoginModal, setShowLoginModal] = useState(false);
-
   const [toast, setToast] = useState({ open: false, message: "", type: "success" });
-
-  const token = localStorage.getItem("token");
 
   const showToast = useCallback((message, type = "success") => {
     setToast({ open: true, message, type });
     setTimeout(() => setToast({ open: false, message: "", type: "success" }), 2500);
   }, []);
 
+  const getToken = () => localStorage.getItem("token");
+
+  // Fetch cart and wishlist whenever user changes (login/logout)
   useEffect(() => {
     const fetchUserData = async () => {
+      const token = getToken();
       if (!user || !token) {
         setWishlistItems([]);
         setCartItems([]);
@@ -30,10 +33,10 @@ export const ShopProvider = ({ children }) => {
 
       try {
         const [wishlistRes, cartRes] = await Promise.all([
-          fetch("http://localhost:5000/api/wishlist", {
+          fetch(`${BASE_URL}/wishlist`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch("http://localhost:5000/api/cart", {
+          fetch(`${BASE_URL}/cart`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
@@ -49,9 +52,10 @@ export const ShopProvider = ({ children }) => {
     };
 
     fetchUserData();
-  }, [user, token]);
+  }, [user]);
 
   const requireAuth = () => {
+    const token = getToken();
     if (!user || !token) {
       setShowLoginModal(true);
       return false;
@@ -59,15 +63,32 @@ export const ShopProvider = ({ children }) => {
     return true;
   };
 
+  // Helper: normalize any product id to string
+  const normalizeId = (id) => String(id ?? "");
+
   const toggleWishlist = async (product) => {
     if (!requireAuth()) return;
+    const token = getToken();
+    // Support both id and _id
+    const productId = normalizeId(product.id || product._id);
 
-    const productId = String(product.id || product._id);
+    // Optimistic update
+    const alreadyIn = wishlistItems.some(
+      (item) => normalizeId(item.id || item._id) === productId
+    );
+
+    if (alreadyIn) {
+      setWishlistItems((prev) =>
+        prev.filter((item) => normalizeId(item.id || item._id) !== productId)
+      );
+    } else {
+      setWishlistItems((prev) => [...prev, { ...product, id: productId }]);
+    }
 
     try {
       const payload = { ...product, id: productId };
 
-      const res = await fetch("http://localhost:5000/api/wishlist/toggle", {
+      const res = await fetch(`${BASE_URL}/wishlist/toggle`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -77,24 +98,36 @@ export const ShopProvider = ({ children }) => {
       });
 
       const data = await res.json();
+      // Sync with server response
       const newItems = Array.isArray(data) ? data : [];
       setWishlistItems(newItems);
-
-      const wasInWishlist = wishlistItems.some((item) => String(item.id) === productId);
-      showToast(wasInWishlist ? "Removed from wishlist" : "Added to wishlist ❤️");
+      showToast(alreadyIn ? "Removed from wishlist" : "Added to wishlist ❤️");
     } catch (error) {
       console.error("Failed to update wishlist", error);
+      // Revert optimistic update on error
+      setWishlistItems((prev) =>
+        alreadyIn
+          ? [...prev, { ...product, id: productId }]
+          : prev.filter((item) => normalizeId(item.id || item._id) !== productId)
+      );
     }
   };
 
-  const isWishlisted = (id) => {
-    return wishlistItems.some((item) => String(item.id) === String(id));
-  };
+  // Check if a product is wishlisted — handles both id and _id
+  const isWishlisted = useCallback(
+    (id) => {
+      const normalizedId = normalizeId(id);
+      return wishlistItems.some(
+        (item) => normalizeId(item.id || item._id) === normalizedId
+      );
+    },
+    [wishlistItems]
+  );
 
   const addToCart = async (product, qty = 1, size = "", color = "") => {
     if (!requireAuth()) return;
-
-    const productId = String(product.id || product._id);
+    const token = getToken();
+    const productId = normalizeId(product.id || product._id);
 
     const payload = {
       ...product,
@@ -104,8 +137,28 @@ export const ShopProvider = ({ children }) => {
       selectedColor: color,
     };
 
+    // Optimistic update
+    setCartItems((prev) => {
+      const exists = prev.find(
+        (item) =>
+          normalizeId(item.id || item._id) === productId &&
+          item.selectedSize === size &&
+          item.selectedColor === color
+      );
+      if (exists) {
+        return prev.map((item) =>
+          normalizeId(item.id || item._id) === productId &&
+          item.selectedSize === size &&
+          item.selectedColor === color
+            ? { ...item, quantity: (item.quantity || 1) + qty }
+            : item
+        );
+      }
+      return [...prev, payload];
+    });
+
     try {
-      const res = await fetch("http://localhost:5000/api/cart/add", {
+      const res = await fetch(`${BASE_URL}/cart/add`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -122,12 +175,10 @@ export const ShopProvider = ({ children }) => {
     }
   };
 
-  // NEW: buyNow - adds to cart then navigates to checkout
-  // Returns true if auth ok (caller navigates), false if not authed
   const buyNow = async (product, qty = 1, size = "", color = "", navigateFn) => {
     if (!requireAuth()) return;
-
-    const productId = String(product.id || product._id);
+    const token = getToken();
+    const productId = normalizeId(product.id || product._id);
 
     const payload = {
       ...product,
@@ -138,7 +189,7 @@ export const ShopProvider = ({ children }) => {
     };
 
     try {
-      const res = await fetch("http://localhost:5000/api/cart/add", {
+      const res = await fetch(`${BASE_URL}/cart/add`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -149,19 +200,26 @@ export const ShopProvider = ({ children }) => {
 
       const data = await res.json();
       setCartItems(Array.isArray(data) ? data : []);
-
-      // Navigate to checkout
       if (navigateFn) navigateFn("/checkout");
     } catch (error) {
       console.error("Failed to buy now", error);
+      // Still navigate on error — cart was saved locally
+      if (navigateFn) navigateFn("/checkout");
     }
   };
 
   const removeFromWishlist = async (id) => {
     if (!requireAuth()) return;
+    const token = getToken();
+    const normalizedId = normalizeId(id);
+
+    // Optimistic update
+    setWishlistItems((prev) =>
+      prev.filter((item) => normalizeId(item.id || item._id) !== normalizedId)
+    );
 
     try {
-      const res = await fetch(`http://localhost:5000/api/wishlist/${id}`, {
+      const res = await fetch(`${BASE_URL}/wishlist/${normalizedId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -175,15 +233,29 @@ export const ShopProvider = ({ children }) => {
 
   const removeFromCart = async (id, size, color) => {
     if (!requireAuth()) return;
+    const token = getToken();
+    const normalizedId = normalizeId(id);
+
+    // Optimistic update
+    setCartItems((prev) =>
+      prev.filter(
+        (item) =>
+          !(
+            normalizeId(item.id || item._id) === normalizedId &&
+            item.selectedSize === size &&
+            item.selectedColor === color
+          )
+      )
+    );
 
     try {
-      const res = await fetch("http://localhost:5000/api/cart/remove", {
+      const res = await fetch(`${BASE_URL}/cart/remove`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ id, selectedSize: size, selectedColor: color }),
+        body: JSON.stringify({ id: normalizedId, selectedSize: size, selectedColor: color }),
       });
 
       const data = await res.json();
@@ -195,15 +267,28 @@ export const ShopProvider = ({ children }) => {
 
   const increaseQty = async (id, size, color) => {
     if (!requireAuth()) return;
+    const token = getToken();
+    const normalizedId = normalizeId(id);
+
+    // Optimistic update
+    setCartItems((prev) =>
+      prev.map((item) =>
+        normalizeId(item.id || item._id) === normalizedId &&
+        item.selectedSize === size &&
+        item.selectedColor === color
+          ? { ...item, quantity: (item.quantity || 1) + 1 }
+          : item
+      )
+    );
 
     try {
-      const res = await fetch("http://localhost:5000/api/cart/qty", {
+      const res = await fetch(`${BASE_URL}/cart/qty`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ id, selectedSize: size, selectedColor: color, type: "increase" }),
+        body: JSON.stringify({ id: normalizedId, selectedSize: size, selectedColor: color, type: "increase" }),
       });
 
       const data = await res.json();
@@ -215,15 +300,28 @@ export const ShopProvider = ({ children }) => {
 
   const decreaseQty = async (id, size, color) => {
     if (!requireAuth()) return;
+    const token = getToken();
+    const normalizedId = normalizeId(id);
+
+    // Optimistic update
+    setCartItems((prev) =>
+      prev.map((item) =>
+        normalizeId(item.id || item._id) === normalizedId &&
+        item.selectedSize === size &&
+        item.selectedColor === color
+          ? { ...item, quantity: Math.max(1, (item.quantity || 1) - 1) }
+          : item
+      )
+    );
 
     try {
-      const res = await fetch("http://localhost:5000/api/cart/qty", {
+      const res = await fetch(`${BASE_URL}/cart/qty`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ id, selectedSize: size, selectedColor: color, type: "decrease" }),
+        body: JSON.stringify({ id: normalizedId, selectedSize: size, selectedColor: color, type: "decrease" }),
       });
 
       const data = await res.json();
@@ -233,6 +331,7 @@ export const ShopProvider = ({ children }) => {
     }
   };
 
+  // clearCart only clears local state (server clears on order create)
   const clearCart = () => setCartItems([]);
 
   const cartCount = useMemo(

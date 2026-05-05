@@ -1,3 +1,4 @@
+// frontend/src/pages/Checkout.jsx
 import { useState, useMemo } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -5,6 +6,7 @@ import { ShoppingBag, MapPin, CreditCard, Truck } from "lucide-react";
 import { useShop } from "../context/ShopContext";
 import { useAuth } from "../context/AuthContext";
 import AuthPopup from "../components/AuthPopup";
+import API from "../api/api";
 
 export default function Checkout() {
   const outletContext = useOutletContext() || {};
@@ -15,7 +17,7 @@ export default function Checkout() {
   const { cartItems, clearCart } = useShop();
   const { user } = useAuth();
 
-  const [step, setStep] = useState(1); // 1=address, 2=payment, 3=review
+  const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [orderId, setOrderId] = useState(null);
@@ -72,20 +74,11 @@ export default function Checkout() {
         total,
       };
 
-      const res = await fetch("http://localhost:5000/api/orders/create", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(orderPayload),
+      const res = await API.post("/orders/create", orderPayload, {
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      const data = await res.json();
-
-      if (!res.ok) throw new Error(data.message || "Order failed");
-
-      setOrderId(data._id);
+      setOrderId(res.data._id);
       clearCart();
       setOrderSuccess(true);
     } catch (err) {
@@ -116,7 +109,6 @@ export default function Checkout() {
     <>
       <div className="pt-36 pb-24 px-4 sm:px-6 md:px-12 bg-[#f8f5ef] min-h-screen">
         <div className="max-w-7xl mx-auto">
-          {/* Header */}
           <div className="mb-10 text-center">
             <p className="text-[11px] uppercase tracking-[0.35em] text-[#9f7a49] mb-3">Secure Checkout</p>
             <h1 className="font-serif text-4xl md:text-5xl font-light text-[#111]">Checkout</h1>
@@ -145,7 +137,6 @@ export default function Checkout() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-8">
-            {/* Left - Form */}
             <div className="space-y-6">
               {/* Step 1: Address */}
               {step === 1 && (
@@ -160,47 +151,24 @@ export default function Checkout() {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs uppercase tracking-[0.18em] text-[#9a8d81] mb-2">Full Name</label>
-                      <input
-                        name="name"
-                        value={form.name}
-                        onChange={handleChange}
-                        className="w-full border border-[#ddd2c8] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#111] transition"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs uppercase tracking-[0.18em] text-[#9a8d81] mb-2">Email</label>
-                      <input
-                        name="email"
-                        type="email"
-                        value={form.email}
-                        onChange={handleChange}
-                        className="w-full border border-[#ddd2c8] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#111] transition"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs uppercase tracking-[0.18em] text-[#9a8d81] mb-2">Phone</label>
-                      <input
-                        name="phone"
-                        value={form.phone}
-                        onChange={handleChange}
-                        className="w-full border border-[#ddd2c8] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#111] transition"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs uppercase tracking-[0.18em] text-[#9a8d81] mb-2">Zip / Pincode</label>
-                      <input
-                        name="zip"
-                        value={form.zip}
-                        onChange={handleChange}
-                        className="w-full border border-[#ddd2c8] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#111] transition"
-                        required
-                      />
-                    </div>
+                    {[
+                      { name: "name", label: "Full Name", type: "text" },
+                      { name: "email", label: "Email", type: "email" },
+                      { name: "phone", label: "Phone", type: "text" },
+                      { name: "zip", label: "Zip / Pincode", type: "text" },
+                    ].map((field) => (
+                      <div key={field.name}>
+                        <label className="block text-xs uppercase tracking-[0.18em] text-[#9a8d81] mb-2">{field.label}</label>
+                        <input
+                          name={field.name}
+                          type={field.type}
+                          value={form[field.name]}
+                          onChange={handleChange}
+                          className="w-full border border-[#ddd2c8] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#111] transition"
+                          required
+                        />
+                      </div>
+                    ))}
                     <div className="sm:col-span-2">
                       <label className="block text-xs uppercase tracking-[0.18em] text-[#9a8d81] mb-2">Address</label>
                       <textarea
@@ -212,26 +180,21 @@ export default function Checkout() {
                         required
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs uppercase tracking-[0.18em] text-[#9a8d81] mb-2">City</label>
-                      <input
-                        name="city"
-                        value={form.city}
-                        onChange={handleChange}
-                        className="w-full border border-[#ddd2c8] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#111] transition"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs uppercase tracking-[0.18em] text-[#9a8d81] mb-2">State</label>
-                      <input
-                        name="state"
-                        value={form.state}
-                        onChange={handleChange}
-                        className="w-full border border-[#ddd2c8] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#111] transition"
-                        required
-                      />
-                    </div>
+                    {[
+                      { name: "city", label: "City" },
+                      { name: "state", label: "State" },
+                    ].map((field) => (
+                      <div key={field.name}>
+                        <label className="block text-xs uppercase tracking-[0.18em] text-[#9a8d81] mb-2">{field.label}</label>
+                        <input
+                          name={field.name}
+                          value={form[field.name]}
+                          onChange={handleChange}
+                          className="w-full border border-[#ddd2c8] rounded-xl px-4 py-3 text-sm outline-none focus:border-[#111] transition"
+                          required
+                        />
+                      </div>
+                    ))}
                   </div>
 
                   <button
@@ -266,7 +229,7 @@ export default function Checkout() {
                   <div className="space-y-3">
                     {[
                       { value: "cod", label: "Cash on Delivery", desc: "Pay when your order arrives", icon: "💵" },
-                      { value: "online", label: "Online Payment", desc: "UPI / Card / Net Banking (Razorpay)", icon: "💳" },
+                      { value: "online", label: "Online Payment", desc: "UPI / Card / Net Banking", icon: "💳" },
                     ].map((method) => (
                       <label
                         key={method.value}
@@ -294,18 +257,8 @@ export default function Checkout() {
                   </div>
 
                   <div className="flex gap-3 mt-6">
-                    <button
-                      onClick={() => setStep(1)}
-                      className="flex-1 rounded-full border border-[#ddd2c8] py-3 text-[11px] uppercase tracking-[0.18em] text-[#111] hover:bg-[#f0ebe4] transition"
-                    >
-                      Back
-                    </button>
-                    <button
-                      onClick={() => setStep(3)}
-                      className="flex-1 rounded-full bg-[#111] text-white py-3 text-[11px] uppercase tracking-[0.22em] hover:bg-[#222] transition"
-                    >
-                      Review Order
-                    </button>
+                    <button onClick={() => setStep(1)} className="flex-1 rounded-full border border-[#ddd2c8] py-3 text-[11px] uppercase tracking-[0.18em] text-[#111] hover:bg-[#f0ebe4] transition">Back</button>
+                    <button onClick={() => setStep(3)} className="flex-1 rounded-full bg-[#111] text-white py-3 text-[11px] uppercase tracking-[0.22em] hover:bg-[#222] transition">Review Order</button>
                   </div>
                 </motion.div>
               )}
@@ -322,7 +275,6 @@ export default function Checkout() {
                     <h2 className="font-serif text-2xl font-light text-[#111]">Review & Place Order</h2>
                   </div>
 
-                  {/* Shipping Summary */}
                   <div className="rounded-2xl bg-[#faf7f3] border border-[#ece7df] p-4 mb-4">
                     <p className="text-xs uppercase tracking-[0.18em] text-[#9a8d81] mb-2">Shipping To</p>
                     <p className="text-sm text-[#1b1714] font-medium">{form.name}</p>
@@ -337,15 +289,10 @@ export default function Checkout() {
                     </p>
                   </div>
 
-                  {/* Items */}
                   <div className="space-y-3 mb-6">
                     {cartItems.map((item) => (
                       <div key={`${item.id}-${item.selectedSize}-${item.selectedColor}`} className="flex gap-3 items-center">
-                        <img
-                          src={item.img || item.image}
-                          alt={item.name}
-                          className="w-14 h-14 rounded-xl object-cover border border-[#ece7df]"
-                        />
+                        <img src={item.img || item.image} alt={item.name} className="w-14 h-14 rounded-xl object-cover border border-[#ece7df]" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-[#1b1714] truncate">{item.name}</p>
                           <p className="text-xs text-[#9a8d81]">
@@ -360,12 +307,7 @@ export default function Checkout() {
                   </div>
 
                   <div className="flex gap-3">
-                    <button
-                      onClick={() => setStep(2)}
-                      className="flex-1 rounded-full border border-[#ddd2c8] py-3 text-[11px] uppercase tracking-[0.18em] text-[#111] hover:bg-[#f0ebe4] transition"
-                    >
-                      Back
-                    </button>
+                    <button onClick={() => setStep(2)} className="flex-1 rounded-full border border-[#ddd2c8] py-3 text-[11px] uppercase tracking-[0.18em] text-[#111] hover:bg-[#f0ebe4] transition">Back</button>
                     <button
                       onClick={handlePlaceOrder}
                       disabled={submitting}
@@ -378,7 +320,7 @@ export default function Checkout() {
               )}
             </div>
 
-            {/* Right - Order Summary */}
+            {/* Order Summary */}
             <div className="h-fit bg-white rounded-[24px] border border-[#ece7df] p-6 shadow-sm">
               <div className="flex items-center gap-3 mb-5">
                 <ShoppingBag size={18} className="text-[#b6463a]" />
@@ -395,21 +337,11 @@ export default function Checkout() {
               </div>
 
               <div className="border-t border-[#ece7df] pt-4 space-y-2 text-sm">
-                <div className="flex justify-between text-[#6f675f]">
-                  <span>Subtotal</span>
-                  <span>₹{subtotal}</span>
-                </div>
-                <div className="flex justify-between text-[#6f675f]">
-                  <span>GST (18%)</span>
-                  <span>₹{gst}</span>
-                </div>
-                <div className="flex justify-between text-[#6f675f]">
-                  <span>Delivery</span>
-                  <span className="text-green-600 font-medium">Free</span>
-                </div>
+                <div className="flex justify-between text-[#6f675f]"><span>Subtotal</span><span>₹{subtotal}</span></div>
+                <div className="flex justify-between text-[#6f675f]"><span>GST (18%)</span><span>₹{gst}</span></div>
+                <div className="flex justify-between text-[#6f675f]"><span>Delivery</span><span className="text-green-600 font-medium">Free</span></div>
                 <div className="flex justify-between text-base font-semibold text-[#1b1714] border-t border-[#ece7df] pt-3 mt-1">
-                  <span>Total</span>
-                  <span>₹{total}</span>
+                  <span>Total</span><span>₹{total}</span>
                 </div>
               </div>
             </div>
@@ -417,7 +349,6 @@ export default function Checkout() {
         </div>
       </div>
 
-      {/* Order Success Popup */}
       <AuthPopup
         open={orderSuccess}
         title="Order Placed! 🎉"
